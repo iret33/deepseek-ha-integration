@@ -1,0 +1,7 @@
+{
+  "name": "DeepSeek",
+  "domain": "deepseek",
+  "documentation": "https://github.com/iret33/deepseek-ha-integration#readme",
+  "iot_class": "cloud_polling",
+  "integration_type": "service"
+}
