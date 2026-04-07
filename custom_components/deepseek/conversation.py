@@ -13,6 +13,7 @@ from homeassistant.const import CONF_API_KEY, MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import ulid
 
 from .const import (
@@ -28,34 +29,32 @@ from .const import (
     DEFAULT_REASONING,
     DOMAIN,
 )
+from .entity import DeepSeekBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-# Conversation agent ID
-AGENT_ID = "deepseek"
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up conversation entities."""
+    async_add_entities([DeepSeekConversationEntity(entry)])
 
 
 class DeepSeekConversationEntity(
     conversation.ConversationEntity,
     conversation.AbstractConversationAgent,
+    DeepSeekBaseEntity,
 ):
     """DeepSeek conversation agent."""
     
-    _attr_has_entity_name = True
-    _attr_name = None
-    
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the agent."""
-        self.entry = entry
+        super().__init__(entry)
         self.history: dict[str, list[dict]] = {}
-        self._attr_unique_id = f"{entry.entry_id}-conversation"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": entry.title,
-            "manufacturer": "DeepSeek",
-            "model": "AI Assistant",
-        }
-    
+        
     @property
     def supported_languages(self) -> list[str] | Literal["*"]:
         """Return supported languages."""
@@ -68,6 +67,16 @@ class DeepSeekConversationEntity(
             name="DeepSeek AI",
             url="https://www.deepseek.com",
         )
+    
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to Home Assistant."""
+        await super().async_added_to_hass()
+        conversation.async_set_agent(self.hass, self.entry, self)
+    
+    async def async_will_remove_from_hass(self) -> None:
+        """When entity will be removed from Home Assistant."""
+        conversation.async_unset_agent(self.hass, self.entry)
+        await super().async_will_remove_from_hass()
     
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""

@@ -3,12 +3,13 @@
   "name": "DeepSeek",
   "codeowners": ["@iret33"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["conversation"],
   "documentation": "https://github.com/iret33/deepseek-ha-integration",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "requirements": ["openai>=1.0.0"],
   "version": "1.0.0",
   "single_config_entry": true,
+  "quality_scale": "bronze",
   "loggers": ["deepseek"]
 }
