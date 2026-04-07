@@ -1,0 +1,70 @@
+# DeepSeek services
+
+chat:
+  name: Chat
+  description: Send a message to DeepSeek and get a response.
+  fields:
+    message:
+      name: Message
+      description: The message to send to DeepSeek.
+      required: true
+      example: "What's the weather like today?"
+      selector:
+        text:
+    conversation_id:
+      name: Conversation ID
+      description: Optional conversation ID for maintaining context.
+      required: false
+      example: "conv_12345"
+      selector:
+        text:
+
+summarize:
+  name: Summarize
+  description: Summarize text using DeepSeek.
+  fields:
+    text:
+      name: Text
+      description: The text to summarize.
+      required: true
+      example: "Long article text here..."
+      selector:
+        text:
+    max_length:
+      name: Max Length
+      description: Maximum length of summary in words.
+      required: false
+      default: 100
+      selector:
+        number:
+          min: 10
+          max: 1000
+          step: 10
+          unit_of_measurement: words
+
+translate:
+  name: Translate
+  description: Translate text using DeepSeek.
+  fields:
+    text:
+      name: Text
+      description: The text to translate.
+      required: true
+      example: "Hello, how are you?"
+      selector:
+        text:
+    target_language:
+      name: Target Language
+      description: Language to translate to.
+      required: true
+      example: "Spanish"
+      selector:
+        text:
+    source_language:
+      name: Source Language
+      description: Source language (use 'auto' for auto-detection).
+      required: false
+      default: "auto"
+      example: "English"
+      selector:
+        text:

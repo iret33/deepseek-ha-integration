@@ -1,0 +1,13 @@
+{
+  "domain": "deepseek",
+  "name": "DeepSeek",
+  "codeowners": ["@deepseek-ai"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/deepseek-ai/deepseek-ha-integration",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": ["openai>=1.0.0"],
+  "version": "1.0.0",
+  "loggers": ["deepseek"]
+}
