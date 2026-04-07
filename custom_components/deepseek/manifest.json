@@ -1,7 +1,7 @@
 {
   "domain": "deepseek",
   "name": "DeepSeek",
-  "codeowners": ["@iret33"],
+  "codeowners": ["iret33"],
   "config_flow": true,
   "dependencies": ["conversation"],
   "documentation": "https://github.com/iret33/deepseek-ha-integration#readme",
@@ -9,7 +9,6 @@
   "iot_class": "cloud_polling",
   "requirements": ["openai>=1.0.0"],
   "version": "1.0.0",
-  "single_config_entry": true,
   "quality_scale": "bronze",
   "issue_tracker": "https://github.com/iret33/deepseek-ha-integration/issues",
   "loggers": ["deepseek"]
