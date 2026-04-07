@@ -12,7 +12,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import intent
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import ulid
 
 from .const import (
@@ -33,15 +32,6 @@ _LOGGER = logging.getLogger(__name__)
 
 # Conversation agent ID
 AGENT_ID = "deepseek"
-
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up conversation entities."""
-    async_add_entities([DeepSeekConversationEntity(entry)])
 
 
 class DeepSeekConversationEntity(

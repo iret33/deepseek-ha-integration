@@ -33,13 +33,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Try to use Platform.CONVERSATION if available, otherwise use empty list
+# Conversation integrations don't use platforms in HA 2024.1.0
 PLATFORMS: list[Platform] = []
-try:
-    if hasattr(Platform, "CONVERSATION"):
-        PLATFORMS = [Platform.CONVERSATION]
-except Exception:
-    pass
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -109,23 +104,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "options": entry.options,
         }
 
-        # Set up platforms if available
-        if PLATFORMS:
-            await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        else:
-            # Platform.CONVERSATION not available, register conversation agent directly
-            from .conversation import DeepSeekConversationEntity
+        # Register conversation agent (conversation integrations don't use platforms in HA 2024.1.0)
+        from .conversation import DeepSeekConversationEntity
 
-            conversation_entity = DeepSeekConversationEntity(entry)
+        conversation_entity = DeepSeekConversationEntity(entry)
 
-            # Manually call async_added_to_hass to register the agent
-            conversation_entity.hass = hass
-            await conversation_entity.async_added_to_hass()
+        # Manually call async_added_to_hass to register the agent
+        conversation_entity.hass = hass
+        await conversation_entity.async_added_to_hass()
 
-            # Store conversation entity
-            hass.data[DOMAIN][entry.entry_id][
-                "conversation_entity"
-            ] = conversation_entity
+        # Store conversation entity
+        hass.data[DOMAIN][entry.entry_id]["conversation_entity"] = conversation_entity
 
         # Register services
         await _register_services(hass, entry)
@@ -140,23 +129,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if PLATFORMS:
-        # Use platform unloading
-        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    else:
-        # Manually unload conversation entity
-        if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
-            conversation_entity = hass.data[DOMAIN][entry.entry_id].get(
-                "conversation_entity"
-            )
-            if conversation_entity:
-                await conversation_entity.async_will_remove_from_hass()
-        unload_ok = True
+    # Manually unload conversation entity
+    if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
+        conversation_entity = hass.data[DOMAIN][entry.entry_id].get(
+            "conversation_entity"
+        )
+        if conversation_entity:
+            await conversation_entity.async_will_remove_from_hass()
 
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+    # Remove from hass data
+    hass.data[DOMAIN].pop(entry.entry_id, None)
 
-    return unload_ok
+    return True
 
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
