@@ -1,4 +1,5 @@
 """Config flow for DeepSeek integration."""
+
 from __future__ import annotations
 
 import logging
@@ -47,7 +48,9 @@ STEP_OPTIONS_DATA_SCHEMA = vol.Schema(
             )
         ),
         vol.Optional(CONF_BASE_URL, default=DEFAULT_BASE_URL): str,
-        vol.Optional(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): selector.NumberSelector(
+        vol.Optional(
+            CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS
+        ): selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=1,
                 max=128000,
@@ -55,7 +58,9 @@ STEP_OPTIONS_DATA_SCHEMA = vol.Schema(
                 mode=selector.NumberSelectorMode.BOX,
             )
         ),
-        vol.Optional(CONF_TEMPERATURE, default=DEFAULT_TEMPERATURE): selector.NumberSelector(
+        vol.Optional(
+            CONF_TEMPERATURE, default=DEFAULT_TEMPERATURE
+        ): selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=0.0,
                 max=2.0,
@@ -70,35 +75,42 @@ STEP_OPTIONS_DATA_SCHEMA = vol.Schema(
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect.
-    
+
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-    
+
     api_key = data[CONF_API_KEY]
     base_url = data.get(CONF_BASE_URL, DEFAULT_BASE_URL)
-    
+
     # Test the API key by making a simple request
     client = AsyncOpenAI(
         api_key=api_key,
         base_url=base_url,
     )
-    
+
     try:
         # Test authentication with a simple models list request
         # DeepSeek API is OpenAI-compatible, so we can use the models endpoint
         response = await client.models.list()
-        
+
         # Check if DeepSeek models are available
-        deepseek_models = [model.id for model in response.data if "deepseek" in model.id.lower()]
-        
+        deepseek_models = [
+            model.id for model in response.data if "deepseek" in model.id.lower()
+        ]
+
         if not deepseek_models:
-            raise CannotConnect("No DeepSeek models found. Please check your API key and base URL.")
-        
-        _LOGGER.debug("Successfully connected to DeepSeek API. Available models: %s", deepseek_models)
-        
+            raise CannotConnect(
+                "No DeepSeek models found. Please check your API key and base URL."
+            )
+
+        _LOGGER.debug(
+            "Successfully connected to DeepSeek API. Available models: %s",
+            deepseek_models,
+        )
+
         # Return info to be stored in the config entry
         return {"title": data.get(CONF_NAME, "DeepSeek"), "models": deepseek_models}
-        
+
     except AuthenticationError as err:
         _LOGGER.error("Authentication error: %s", err)
         raise InvalidAuth from err
@@ -121,7 +133,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                info = await validate_input(self.hass, user_input)
+                await validate_input(self.hass, user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
@@ -132,7 +144,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 # Store the validated data
                 self._user_input = user_input
-                
+
                 # Show options step
                 return await self.async_step_options()
 
@@ -154,7 +166,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Combine user input from both steps
             full_data = {**self._user_input, **user_input}
-            
+
             # Create the config entry
             return self.async_create_entry(
                 title=full_data.get(CONF_NAME, "DeepSeek"),
@@ -205,9 +217,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({
-                vol.Required(CONF_API_KEY): str,
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_API_KEY): str,
+                }
+            ),
             errors=errors,
         )
 
@@ -231,10 +245,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_BASE_URL: user_input.get(CONF_BASE_URL, DEFAULT_BASE_URL),
                     }
                     await validate_input(self.hass, test_data)
-                
+
                 # Update options
                 return self.async_create_entry(title="", data=user_input)
-                
+
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
@@ -248,51 +262,51 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         current_data = self.config_entry.data
 
         # Build schema with current values
-        options_schema = vol.Schema({
-            vol.Optional(
-                CONF_API_KEY,
-                default=current_data.get(CONF_API_KEY, "")
-            ): str,
-            vol.Optional(
-                CONF_MODEL,
-                default=current_options.get(CONF_MODEL, DEFAULT_MODEL)
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=MODELS,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                )
-            ),
-            vol.Optional(
-                CONF_BASE_URL,
-                default=current_options.get(CONF_BASE_URL, DEFAULT_BASE_URL)
-            ): str,
-            vol.Optional(
-                CONF_MAX_TOKENS,
-                default=current_options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1,
-                    max=128000,
-                    step=1,
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Optional(
-                CONF_TEMPERATURE,
-                default=current_options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0.0,
-                    max=2.0,
-                    step=0.1,
-                    mode=selector.NumberSelectorMode.SLIDER,
-                )
-            ),
-            vol.Optional(
-                CONF_REASONING,
-                default=current_options.get(CONF_REASONING, DEFAULT_REASONING)
-            ): bool,
-        })
+        options_schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_API_KEY, default=current_data.get(CONF_API_KEY, "")
+                ): str,
+                vol.Optional(
+                    CONF_MODEL, default=current_options.get(CONF_MODEL, DEFAULT_MODEL)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=MODELS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_BASE_URL,
+                    default=current_options.get(CONF_BASE_URL, DEFAULT_BASE_URL),
+                ): str,
+                vol.Optional(
+                    CONF_MAX_TOKENS,
+                    default=current_options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=128000,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_TEMPERATURE,
+                    default=current_options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.0,
+                        max=2.0,
+                        step=0.1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+                vol.Optional(
+                    CONF_REASONING,
+                    default=current_options.get(CONF_REASONING, DEFAULT_REASONING),
+                ): bool,
+            }
+        )
 
         return self.async_show_form(
             step_id="init",

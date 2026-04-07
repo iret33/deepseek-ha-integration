@@ -4,10 +4,10 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.components.deepseek.const import DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from custom_components.deepseek.const import DOMAIN
 from .conftest import mock_deepseek_client
 
 
