@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to DeepSeek",
-        "description": "Enter your DeepSeek API key to connect.\n\nYou can get an API key from [DeepSeek Platform](https://platform.deepseek.com/api-keys).",
+        "description": "Enter your DeepSeek API key to connect.\n\nYou can get an API key from the DeepSeek Platform.",
         "data": {
           "api_key": "API Key",
           "name": "Name (optional)"
@@ -11,7 +11,7 @@
       },
       "options": {
         "title": "Configure DeepSeek",
-        "description": "Configure DeepSeek model and parameters.\n\nLearn more about available models at [DeepSeek API Docs](https://platform.deepseek.com/api-docs).",
+        "description": "Configure DeepSeek model and parameters.\n\nLearn more about available models in the DeepSeek API documentation.",
         "data": {
           "model": "Model",
           "base_url": "Base URL (optional)",
