@@ -10,6 +10,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.components import conversation
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
@@ -29,7 +30,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.CONVERSATION]
+PLATFORMS: list[Platform] = []
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -61,36 +62,73 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up DeepSeek from a config entry."""
     
-    # Create OpenAI client with DeepSeek configuration
-    client = AsyncOpenAI(
-        api_key=entry.data[CONF_API_KEY],
-        base_url=entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
-    )
-    
-    # Store client and config in hass data
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
-        "config": entry.data,
-        "options": entry.options,
-    }
-    
-    # Set up platforms
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
-    # Register services
-    await _register_services(hass, entry)
-    
-    _LOGGER.info("DeepSeek integration setup complete")
-    return True
+    try:
+        _LOGGER.debug("Setting up DeepSeek integration for entry: %s", entry.entry_id)
+        
+        # Create OpenAI client with DeepSeek configuration
+        client = AsyncOpenAI(
+            api_key=entry.data[CONF_API_KEY],
+            base_url=entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
+        )
+        
+        # Test the connection by fetching available models
+        _LOGGER.debug("Testing DeepSeek API connection...")
+        try:
+            models = await client.models.list()
+            available_models = [model.id for model in models.data]
+            _LOGGER.debug("Available models: %s", available_models)
+            
+            # Check if configured model is available
+            configured_model = entry.data.get(CONF_MODEL, DEFAULT_MODEL)
+            if configured_model not in available_models:
+                _LOGGER.warning(
+                    "Configured model '%s' not in available models. Available: %s",
+                    configured_model, available_models
+                )
+        except Exception as err:
+            _LOGGER.warning("Could not fetch models list: %s", err)
+        
+        # Store client and config in hass data
+        hass.data.setdefault(DOMAIN, {})
+        hass.data[DOMAIN][entry.entry_id] = {
+            "client": client,
+            "config": entry.data,
+            "options": entry.options,
+        }
+        
+        # Register conversation agent
+        from .conversation import DeepSeekConversationEntity
+        conversation_entity = DeepSeekConversationEntity(entry)
+        
+        conversation.async_set_agent(
+            hass,
+            entry,
+            conversation_entity,
+        )
+        
+        # Store conversation entity
+        hass.data[DOMAIN][entry.entry_id]["conversation_entity"] = conversation_entity
+        
+        # Register services
+        await _register_services(hass, entry)
+        
+        _LOGGER.info("DeepSeek integration setup complete for '%s'", entry.title)
+        return True
+        
+    except Exception as err:
+        _LOGGER.error("Failed to set up DeepSeek integration: %s", err, exc_info=True)
+        return False
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+    # Unregister conversation agent
+    conversation.async_unset_agent(hass, entry)
     
-    return unload_ok
+    # Remove from hass data
+    hass.data[DOMAIN].pop(entry.entry_id, None)
+    
+    return True
 
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:

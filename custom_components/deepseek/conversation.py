@@ -34,20 +34,6 @@ _LOGGER = logging.getLogger(__name__)
 # Conversation agent ID
 AGENT_ID = "deepseek"
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: conversation.AddEntitiesCallback,
-) -> None:
-    """Set up conversation agent."""
-    
-    # Create conversation entity
-    entity = DeepSeekConversationEntity(entry)
-    async_add_entities([entity])
-    
-    # Store entity reference for service calls
-    hass.data[DOMAIN][entry.entry_id]["conversation_entity"] = entity
-
 
 class DeepSeekConversationEntity(
     conversation.ConversationEntity,
