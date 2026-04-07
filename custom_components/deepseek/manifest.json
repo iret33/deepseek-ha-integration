@@ -7,9 +7,9 @@
   "documentation": "https://github.com/iret33/deepseek-ha-integration#readme",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "requirements": ["openai>=1.0.0"],
-  "version": "1.0.0",
-  "quality_scale": "bronze",
   "issue_tracker": "https://github.com/iret33/deepseek-ha-integration/issues",
-  "loggers": ["deepseek"]
+  "loggers": ["deepseek"],
+  "quality_scale": "bronze",
+  "requirements": ["openai>=1.0.0"],
+  "version": "1.0.0"
 }
