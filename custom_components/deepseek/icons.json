@@ -1,0 +1,8 @@
+{
+  "icon": "mdi:robot",
+  "services": {
+    "chat": "mdi:message-text",
+    "summarize": "mdi:text-short",
+    "translate": "mdi:translate"
+  }
+}

@@ -1,0 +1,43 @@
+rules:
+  config_flow: done
+  docs_high_level_description:
+    status: exempt
+    comment: This integration connects to DeepSeek AI API for conversation services.
+  docs_installation:
+    status: done
+  docs_structure:
+    status: done
+  config_flow_test:
+    status: done
+  config_flow_reauth:
+    status: done
+  config_flow_options:
+    status: done
+  config_flow_discovery:
+    status: exempt
+    comment: This integration does not support discovery.
+  dependency_translation:
+    status: done
+  diagnostics:
+    status: done
+  entity_translation:
+    status: done
+  entity_unavailable:
+    status: exempt
+    comment: This integration does not have entities that can be unavailable.
+  entity_unique_id:
+    status: done
+  integration_icon:
+    status: exempt
+    comment: This integration does not have an icon.
+  integration_notify:
+    status: exempt
+    comment: This integration does not provide notifications.
+  loggers:
+    status: done
+  reauthentication:
+    status: done
+  runtime_data:
+    status: done
+  test_before_commit:
+    status: done
