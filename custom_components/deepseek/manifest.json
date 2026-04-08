@@ -11,5 +11,5 @@
   "loggers": ["deepseek", "openai"],
   "quality_scale": "bronze",
   "requirements": ["openai==1.54.0", "voluptuous-openapi==0.0.5"],
-  "version": "2.0.0"
+  "version": "3.0.0"
 }
