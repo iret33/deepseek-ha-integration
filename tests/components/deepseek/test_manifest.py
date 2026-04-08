@@ -35,8 +35,14 @@ def test_hacs_json_valid() -> None:
 
 
 def test_module_imports() -> None:
-    """The integration module can be imported cleanly."""
-    from custom_components.deepseek import const
+    """The integration modules can be imported cleanly."""
+    import custom_components.deepseek as deepseek_pkg
+    from custom_components.deepseek import config_flow, const, conversation
 
     assert const.DOMAIN == "deepseek"
     assert const.DEFAULT_MODEL in const.MODELS
+    assert hasattr(deepseek_pkg, "async_setup_entry")
+    assert hasattr(deepseek_pkg, "async_unload_entry")
+    assert hasattr(conversation, "async_setup_entry")
+    assert hasattr(conversation, "DeepSeekConversationEntity")
+    assert hasattr(config_flow, "ConfigFlow")
