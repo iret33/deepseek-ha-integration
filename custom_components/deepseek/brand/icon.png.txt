@@ -1,6 +1,0 @@
-This should be a PNG file but we don't have one.
-For HACS validation, actual PNG icon files are required:
-- icon.png (128x128)
-- logo.png (128x128)
-- icon@2x.png (256x256)
-- logo@2x.png (256x256)

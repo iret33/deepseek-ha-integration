@@ -1,287 +1,205 @@
-"""Config flow for DeepSeek integration."""
+"""Config flow for the DeepSeek integration."""
 
 from __future__ import annotations
 
-import logging
+from types import MappingProxyType
 from typing import Any
 
-from openai import AsyncOpenAI, AuthenticationError
+import openai
 import voluptuous as vol
 
-from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry, OptionsFlow
-from homeassistant.const import CONF_API_KEY, CONF_NAME
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.const import CONF_API_KEY, CONF_LLM_HASS_API
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import selector
+from homeassistant.helpers import llm
+from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    TemplateSelector,
+)
+from homeassistant.helpers.typing import VolDictType
 
 from .const import (
     CONF_BASE_URL,
+    CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
-    CONF_MODEL,
+    CONF_PROMPT,
+    CONF_RECOMMENDED,
     CONF_TEMPERATURE,
-    CONF_REASONING,
+    CONF_TOP_P,
     DEFAULT_BASE_URL,
-    DEFAULT_MAX_TOKENS,
-    DEFAULT_MODEL,
-    DEFAULT_TEMPERATURE,
-    DEFAULT_REASONING,
+    DEFAULT_NAME,
     DOMAIN,
-    MODELS,
+    LOGGER,
+    RECOMMENDED_CHAT_MODEL,
+    RECOMMENDED_MAX_TOKENS,
+    RECOMMENDED_TEMPERATURE,
+    RECOMMENDED_TOP_P,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_API_KEY): str,
-        vol.Optional(CONF_NAME, default="DeepSeek"): str,
-    }
-)
-
-STEP_OPTIONS_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=MODELS,
-                mode=selector.SelectSelectorMode.DROPDOWN,
-            )
-        ),
         vol.Optional(CONF_BASE_URL, default=DEFAULT_BASE_URL): str,
-        vol.Optional(
-            CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS
-        ): selector.NumberSelector(
-            selector.NumberSelectorConfig(
-                min=1,
-                max=128000,
-                step=1,
-                mode=selector.NumberSelectorMode.BOX,
-            )
-        ),
-        vol.Optional(
-            CONF_TEMPERATURE, default=DEFAULT_TEMPERATURE
-        ): selector.NumberSelector(
-            selector.NumberSelectorConfig(
-                min=0.0,
-                max=2.0,
-                step=0.1,
-                mode=selector.NumberSelectorMode.SLIDER,
-            )
-        ),
-        vol.Optional(CONF_REASONING, default=DEFAULT_REASONING): bool,
     }
 )
 
+RECOMMENDED_OPTIONS: dict[str, Any] = {
+    CONF_RECOMMENDED: True,
+    CONF_LLM_HASS_API: llm.LLM_API_ASSIST,
+    CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,
+}
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate the user input allows us to connect.
 
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
-
-    api_key = data[CONF_API_KEY]
-    base_url = data.get(CONF_BASE_URL, DEFAULT_BASE_URL)
-
-    # Test the API key by making a simple request
-    client = AsyncOpenAI(
-        api_key=api_key,
-        base_url=base_url,
+async def _validate_api_key(hass: HomeAssistant, data: dict[str, Any]) -> None:
+    """Raise an openai error if the API key or base URL are wrong."""
+    client = openai.AsyncOpenAI(
+        api_key=data[CONF_API_KEY],
+        base_url=data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
+        http_client=get_async_client(hass),
     )
-
-    try:
-        # Test authentication with a simple models list request
-        # DeepSeek API is OpenAI-compatible, so we can use the models endpoint
-        response = await client.models.list()
-
-        # Check if DeepSeek models are available
-        deepseek_models = [
-            model.id for model in response.data if "deepseek" in model.id.lower()
-        ]
-
-        if not deepseek_models:
-            raise CannotConnect(
-                "No DeepSeek models found. Please check your API key and base URL."
-            )
-
-        _LOGGER.debug(
-            "Successfully connected to DeepSeek API. Available models: %s",
-            deepseek_models,
-        )
-
-        # Return info to be stored in the config entry
-        return {"title": data.get(CONF_NAME, "DeepSeek"), "models": deepseek_models}
-
-    except AuthenticationError as err:
-        _LOGGER.error("Authentication error: %s", err)
-        raise InvalidAuth from err
-    except Exception as err:
-        _LOGGER.error("Cannot connect to DeepSeek API: %s", err)
-        raise CannotConnect from err
+    await client.with_options(timeout=10.0).models.list()
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class DeepSeekConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for DeepSeek."""
 
     VERSION = 1
 
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the initial step."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
+            )
+
+        errors: dict[str, str] = {}
+        try:
+            await _validate_api_key(self.hass, user_input)
+        except openai.AuthenticationError:
+            errors["base"] = "invalid_auth"
+        except openai.APIConnectionError:
+            errors["base"] = "cannot_connect"
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Unexpected exception validating DeepSeek API key")
+            errors["base"] = "unknown"
+        else:
+            return self.async_create_entry(
+                title=DEFAULT_NAME,
+                data=user_input,
+                options=RECOMMENDED_OPTIONS,
+            )
+
+        return self.async_show_form(
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        """Get the options flow for this handler."""
-        return OptionsFlowHandler()
+        """Create the options flow."""
+        return DeepSeekOptionsFlow(config_entry)
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the initial step."""
-        errors: dict[str, str] = {}
 
-        if user_input is not None:
-            try:
-                await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
-                # Store the validated data
-                self._user_input = user_input
+class DeepSeekOptionsFlow(OptionsFlow):
+    """DeepSeek options flow."""
 
-                # Show options step
-                return await self.async_step_options()
-
-        return self.async_show_form(
-            step_id="user",
-            data_schema=STEP_USER_DATA_SCHEMA,
-            errors=errors,
-            description_placeholders={
-                "docs_url": "https://platform.deepseek.com/api-keys"
-            },
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.last_rendered_recommended = config_entry.options.get(
+            CONF_RECOMMENDED, False
         )
-
-    async def async_step_options(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the options step."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            # Combine user input from both steps
-            full_data = {**self._user_input, **user_input}
-
-            # Create the config entry
-            return self.async_create_entry(
-                title=full_data.get(CONF_NAME, "DeepSeek"),
-                data=full_data,
-            )
-
-        # Show options form with defaults
-        return self.async_show_form(
-            step_id="options",
-            data_schema=STEP_OPTIONS_DATA_SCHEMA,
-            errors=errors,
-            description_placeholders={
-                "model_docs": "https://platform.deepseek.com/api-docs"
-            },
-        )
-
-
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for DeepSeek."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Manage the options."""
-        errors: dict[str, str] = {}
+    ) -> ConfigFlowResult:
+        """Manage options."""
+        options: dict[str, Any] | MappingProxyType[str, Any] = self.config_entry.options
 
         if user_input is not None:
-            # Validate the input
-            try:
-                # Test the API key if it was changed
-                if CONF_API_KEY in user_input:
-                    test_data = {
-                        CONF_API_KEY: user_input[CONF_API_KEY],
-                        CONF_BASE_URL: user_input.get(CONF_BASE_URL, DEFAULT_BASE_URL),
-                    }
-                    await validate_input(self.hass, test_data)
-
-                # Update options
+            if user_input.get(CONF_RECOMMENDED) == self.last_rendered_recommended:
+                if user_input.get(CONF_LLM_HASS_API) == "none":
+                    user_input.pop(CONF_LLM_HASS_API, None)
                 return self.async_create_entry(title="", data=user_input)
 
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-
-        # Get current options
-        current_options = self.config_entry.options
-        current_data = self.config_entry.data
-
-        # Build schema with current values
-        options_schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_API_KEY, default=current_data.get(CONF_API_KEY, "")
-                ): str,
-                vol.Optional(
-                    CONF_MODEL, default=current_options.get(CONF_MODEL, DEFAULT_MODEL)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=MODELS,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Optional(
-                    CONF_BASE_URL,
-                    default=current_options.get(CONF_BASE_URL, DEFAULT_BASE_URL),
-                ): str,
-                vol.Optional(
-                    CONF_MAX_TOKENS,
-                    default=current_options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=1,
-                        max=128000,
-                        step=1,
-                        mode=selector.NumberSelectorMode.BOX,
-                    )
-                ),
-                vol.Optional(
-                    CONF_TEMPERATURE,
-                    default=current_options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=0.0,
-                        max=2.0,
-                        step=0.1,
-                        mode=selector.NumberSelectorMode.SLIDER,
-                    )
-                ),
-                vol.Optional(
-                    CONF_REASONING,
-                    default=current_options.get(CONF_REASONING, DEFAULT_REASONING),
-                ): bool,
+            self.last_rendered_recommended = bool(user_input.get(CONF_RECOMMENDED))
+            options = {
+                CONF_RECOMMENDED: user_input.get(CONF_RECOMMENDED, False),
+                CONF_PROMPT: user_input.get(CONF_PROMPT),
+                CONF_LLM_HASS_API: user_input.get(CONF_LLM_HASS_API),
             }
-        )
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=options_schema,
-            errors=errors,
-        )
+        schema = _options_schema(self.hass, options)
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
 
 
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
+def _options_schema(
+    hass: HomeAssistant,
+    options: dict[str, Any] | MappingProxyType[str, Any],
+) -> VolDictType:
+    """Build the options schema."""
+    hass_apis: list[SelectOptionDict] = [
+        SelectOptionDict(label="No control", value="none")
+    ]
+    hass_apis.extend(
+        SelectOptionDict(label=api.name, value=api.id) for api in llm.async_get_apis(hass)
+    )
 
+    schema: VolDictType = {
+        vol.Optional(
+            CONF_PROMPT,
+            description={
+                "suggested_value": options.get(
+                    CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT
+                )
+            },
+        ): TemplateSelector(),
+        vol.Optional(
+            CONF_LLM_HASS_API,
+            description={"suggested_value": options.get(CONF_LLM_HASS_API)},
+            default="none",
+        ): SelectSelector(SelectSelectorConfig(options=hass_apis)),
+        vol.Required(
+            CONF_RECOMMENDED, default=options.get(CONF_RECOMMENDED, False)
+        ): bool,
+    }
 
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
+    if options.get(CONF_RECOMMENDED):
+        return schema
+
+    schema.update(
+        {
+            vol.Optional(
+                CONF_CHAT_MODEL,
+                description={"suggested_value": options.get(CONF_CHAT_MODEL)},
+                default=RECOMMENDED_CHAT_MODEL,
+            ): str,
+            vol.Optional(
+                CONF_MAX_TOKENS,
+                description={"suggested_value": options.get(CONF_MAX_TOKENS)},
+                default=RECOMMENDED_MAX_TOKENS,
+            ): int,
+            vol.Optional(
+                CONF_TOP_P,
+                description={"suggested_value": options.get(CONF_TOP_P)},
+                default=RECOMMENDED_TOP_P,
+            ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),
+            vol.Optional(
+                CONF_TEMPERATURE,
+                description={"suggested_value": options.get(CONF_TEMPERATURE)},
+                default=RECOMMENDED_TEMPERATURE,
+            ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),
+        }
+    )
+    return schema

@@ -2,36 +2,52 @@
 
 from __future__ import annotations
 
-import logging
-from typing import Literal
+from collections.abc import Callable
+import json
+from typing import Any, Literal
 
 import openai
+from openai._types import NOT_GIVEN
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessage,
+    ChatCompletionMessageParam,
+    ChatCompletionMessageToolCallParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionToolParam,
+    ChatCompletionUserMessageParam,
+)
+from openai.types.chat.chat_completion_message_tool_call_param import Function
+from openai.types.shared_params import FunctionDefinition
+import voluptuous as vol
+from voluptuous_openapi import convert
 
 from homeassistant.components import conversation
-from homeassistant.const import MATCH_ALL
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_LLM_HASS_API, MATCH_ALL
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, intent
+from homeassistant.exceptions import HomeAssistantError, TemplateError
+from homeassistant.helpers import device_registry as dr, intent, llm, template
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import ulid
 
 from . import DeepSeekConfigEntry
 from .const import (
+    CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
-    CONF_MODEL,
+    CONF_PROMPT,
     CONF_TEMPERATURE,
-    DEFAULT_MAX_TOKENS,
-    DEFAULT_MODEL,
-    DEFAULT_TEMPERATURE,
+    CONF_TOP_P,
     DOMAIN,
+    LOGGER,
+    RECOMMENDED_CHAT_MODEL,
+    RECOMMENDED_MAX_TOKENS,
+    RECOMMENDED_TEMPERATURE,
+    RECOMMENDED_TOP_P,
 )
 
-_LOGGER = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = (
-    "You are DeepSeek, a helpful AI assistant integrated with Home Assistant. "
-    "Be concise, accurate, and friendly."
-)
-MAX_HISTORY = 10
+MAX_TOOL_ITERATIONS = 10
 
 
 async def async_setup_entry(
@@ -41,6 +57,19 @@ async def async_setup_entry(
 ) -> None:
     """Set up the DeepSeek conversation entity."""
     async_add_entities([DeepSeekConversationEntity(config_entry)])
+
+
+def _format_tool(
+    tool: llm.Tool, custom_serializer: Callable[[Any], Any] | None
+) -> ChatCompletionToolParam:
+    """Convert an HA LLM tool to an OpenAI tool spec."""
+    tool_spec = FunctionDefinition(
+        name=tool.name,
+        parameters=convert(tool.parameters, custom_serializer=custom_serializer),
+    )
+    if tool.description:
+        tool_spec["description"] = tool.description
+    return ChatCompletionToolParam(type="function", function=tool_spec)
 
 
 class DeepSeekConversationEntity(
@@ -54,17 +83,19 @@ class DeepSeekConversationEntity(
     def __init__(self, entry: DeepSeekConfigEntry) -> None:
         """Initialize the agent."""
         self.entry = entry
-        self.history: dict[str, list[dict]] = {}
+        self.history: dict[str, list[ChatCompletionMessageParam]] = {}
         self._attr_unique_id = entry.entry_id
         self._attr_device_info = dr.DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
             manufacturer="DeepSeek",
-            model=entry.options.get(
-                CONF_MODEL, entry.data.get(CONF_MODEL, DEFAULT_MODEL)
-            ),
+            model=entry.options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
             entry_type=dr.DeviceEntryType.SERVICE,
         )
+        if self.entry.options.get(CONF_LLM_HASS_API):
+            self._attr_supported_features = (
+                conversation.ConversationEntityFeature.CONTROL
+            )
 
     @property
     def supported_languages(self) -> list[str] | Literal["*"]:
@@ -75,6 +106,9 @@ class DeepSeekConversationEntity(
         """When entity is added to Home Assistant."""
         await super().async_added_to_hass()
         conversation.async_set_agent(self.hass, self.entry, self)
+        self.entry.async_on_unload(
+            self.entry.add_update_listener(self._async_entry_update_listener)
+        )
 
     async def async_will_remove_from_hass(self) -> None:
         """When entity will be removed from Home Assistant."""
@@ -86,54 +120,188 @@ class DeepSeekConversationEntity(
     ) -> conversation.ConversationResult:
         """Process a sentence."""
         options = self.entry.options
-        data = self.entry.data
-        model = options.get(CONF_MODEL, data.get(CONF_MODEL, DEFAULT_MODEL))
-        max_tokens = options.get(
-            CONF_MAX_TOKENS, data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)
-        )
-        temperature = options.get(
-            CONF_TEMPERATURE, data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
-        )
-
-        if user_input.conversation_id and user_input.conversation_id in self.history:
-            conversation_id = user_input.conversation_id
-            messages = list(self.history[conversation_id])
-        else:
-            conversation_id = user_input.conversation_id or ulid.ulid_now()
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-        messages.append({"role": "user", "content": user_input.text})
-
         intent_response = intent.IntentResponse(language=user_input.language)
-        client: openai.AsyncOpenAI = self.entry.runtime_data
+        llm_api: llm.APIInstance | None = None
+        tools: list[ChatCompletionToolParam] | None = None
+        user_name: str | None = None
+        llm_context = llm.LLMContext(
+            platform=DOMAIN,
+            context=user_input.context,
+            user_prompt=user_input.text,
+            language=user_input.language,
+            assistant=conversation.DOMAIN,
+            device_id=user_input.device_id,
+        )
+
+        if options.get(CONF_LLM_HASS_API):
+            try:
+                llm_api = await llm.async_get_api(
+                    self.hass, options[CONF_LLM_HASS_API], llm_context
+                )
+            except HomeAssistantError as err:
+                LOGGER.error("Error getting LLM API: %s", err)
+                intent_response.async_set_error(
+                    intent.IntentResponseErrorCode.UNKNOWN,
+                    "Error preparing LLM API",
+                )
+                return conversation.ConversationResult(
+                    response=intent_response,
+                    conversation_id=user_input.conversation_id,
+                )
+            tools = [
+                _format_tool(tool, llm_api.custom_serializer) for tool in llm_api.tools
+            ]
+
+        if user_input.conversation_id is None:
+            conversation_id = ulid.ulid_now()
+            messages = []
+        elif user_input.conversation_id in self.history:
+            conversation_id = user_input.conversation_id
+            messages = self.history[conversation_id]
+        else:
+            try:
+                ulid.ulid_to_bytes(user_input.conversation_id)
+                conversation_id = ulid.ulid_now()
+            except ValueError:
+                conversation_id = user_input.conversation_id
+            messages = []
+
+        if (
+            user_input.context
+            and user_input.context.user_id
+            and (
+                user := await self.hass.auth.async_get_user(user_input.context.user_id)
+            )
+        ):
+            user_name = user.name
 
         try:
-            result = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                user=conversation_id,
-            )
-        except openai.OpenAIError as err:
-            _LOGGER.error("Error talking to DeepSeek: %s", err)
+            prompt_parts = [
+                template.Template(
+                    llm.BASE_PROMPT
+                    + options.get(CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT),
+                    self.hass,
+                ).async_render(
+                    {
+                        "ha_name": self.hass.config.location_name,
+                        "user_name": user_name,
+                        "llm_context": llm_context,
+                    },
+                    parse_result=False,
+                )
+            ]
+        except TemplateError as err:
+            LOGGER.error("Error rendering prompt: %s", err)
             intent_response.async_set_error(
                 intent.IntentResponseErrorCode.UNKNOWN,
-                "Sorry, I had a problem talking to DeepSeek",
+                "Sorry, I had a problem with my template",
             )
             return conversation.ConversationResult(
                 response=intent_response, conversation_id=conversation_id
             )
 
-        response_text = result.choices[0].message.content or ""
-        messages.append({"role": "assistant", "content": response_text})
+        if llm_api:
+            prompt_parts.append(llm_api.api_prompt)
+        prompt = "\n".join(prompt_parts)
 
-        # Trim history: keep system + last (MAX_HISTORY - 1) turns.
-        if len(messages) > MAX_HISTORY:
-            messages = [messages[0]] + messages[-(MAX_HISTORY - 1) :]
+        messages = [
+            ChatCompletionSystemMessageParam(role="system", content=prompt),
+            *messages[1:],
+            ChatCompletionUserMessageParam(role="user", content=user_input.text),
+        ]
+
+        LOGGER.debug("Prompt: %s", messages)
+        LOGGER.debug("Tools: %s", tools)
+
+        client: openai.AsyncOpenAI = self.entry.runtime_data
+
+        for _iteration in range(MAX_TOOL_ITERATIONS):
+            try:
+                result = await client.chat.completions.create(
+                    model=options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
+                    messages=messages,
+                    tools=tools or NOT_GIVEN,
+                    max_tokens=options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS),
+                    top_p=options.get(CONF_TOP_P, RECOMMENDED_TOP_P),
+                    temperature=options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE),
+                    user=conversation_id,
+                )
+            except openai.OpenAIError as err:
+                LOGGER.error("Error talking to DeepSeek: %s", err)
+                intent_response.async_set_error(
+                    intent.IntentResponseErrorCode.UNKNOWN,
+                    "Sorry, I had a problem talking to DeepSeek",
+                )
+                return conversation.ConversationResult(
+                    response=intent_response, conversation_id=conversation_id
+                )
+
+            LOGGER.debug("Response %s", result)
+            response = result.choices[0].message
+
+            def _message_convert(
+                message: ChatCompletionMessage,
+            ) -> ChatCompletionMessageParam:
+                tool_calls: list[ChatCompletionMessageToolCallParam] = []
+                if message.tool_calls:
+                    tool_calls = [
+                        ChatCompletionMessageToolCallParam(
+                            id=tool_call.id,
+                            function=Function(
+                                arguments=tool_call.function.arguments,
+                                name=tool_call.function.name,
+                            ),
+                            type=tool_call.type,
+                        )
+                        for tool_call in message.tool_calls
+                    ]
+                param = ChatCompletionAssistantMessageParam(
+                    role=message.role,
+                    content=message.content,
+                )
+                if tool_calls:
+                    param["tool_calls"] = tool_calls
+                return param
+
+            messages.append(_message_convert(response))
+            tool_calls = response.tool_calls
+
+            if not tool_calls or not llm_api:
+                break
+
+            for tool_call in tool_calls:
+                tool_input = llm.ToolInput(
+                    tool_name=tool_call.function.name,
+                    tool_args=json.loads(tool_call.function.arguments),
+                )
+                LOGGER.debug(
+                    "Tool call: %s(%s)", tool_input.tool_name, tool_input.tool_args
+                )
+                try:
+                    tool_response = await llm_api.async_call_tool(tool_input)
+                except (HomeAssistantError, vol.Invalid) as err:
+                    tool_response = {"error": type(err).__name__}
+                    if str(err):
+                        tool_response["error_text"] = str(err)
+
+                LOGGER.debug("Tool response: %s", tool_response)
+                messages.append(
+                    ChatCompletionToolMessageParam(
+                        role="tool",
+                        tool_call_id=tool_call.id,
+                        content=json.dumps(tool_response),
+                    )
+                )
+
         self.history[conversation_id] = messages
 
-        intent_response.async_set_speech(response_text)
+        intent_response.async_set_speech(response.content or "")
         return conversation.ConversationResult(
             response=intent_response, conversation_id=conversation_id
         )
+
+    async def _async_entry_update_listener(
+        self, hass: HomeAssistant, entry: ConfigEntry
+    ) -> None:
+        """Reload on options update."""
+        await hass.config_entries.async_reload(entry.entry_id)

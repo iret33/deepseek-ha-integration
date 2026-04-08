@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <rect width="128" height="128" rx="20" fill="#10a37f"/>
-  <text x="64" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="white">DS</text>
-  <text x="64" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">DeepSeek</text>
-</svg>

@@ -3,101 +3,45 @@
     "step": {
       "user": {
         "title": "Connect to DeepSeek",
-        "description": "Enter your DeepSeek API key to connect.\n\nYou can get an API key from the DeepSeek Platform.",
+        "description": "Enter your DeepSeek API key. Get one at https://platform.deepseek.com/api-keys",
         "data": {
-          "api_key": "API Key",
-          "name": "Name (optional)"
+          "api_key": "API key",
+          "name": "Name"
         }
       },
       "options": {
         "title": "Configure DeepSeek",
-        "description": "Configure DeepSeek model and parameters.\n\nLearn more about available models in the DeepSeek API documentation.",
+        "description": "Choose the DeepSeek model and parameters.",
         "data": {
           "model": "Model",
-          "base_url": "Base URL (optional)",
-          "max_tokens": "Max Tokens",
+          "base_url": "Base URL",
+          "max_tokens": "Maximum tokens",
           "temperature": "Temperature",
-          "show_reasoning": "Show Reasoning (for deepseek-reasoner)"
-        }
-      },
-      "reauth_confirm": {
-        "title": "Re-authenticate DeepSeek",
-        "description": "Your DeepSeek API key is invalid or expired. Please enter a new API key.",
-        "data": {
-          "api_key": "API Key"
+          "show_reasoning": "Show reasoning (deepseek-reasoner only)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to DeepSeek API. Please check your internet connection and API key.",
-      "invalid_auth": "Invalid API key. Please check your DeepSeek API key.",
-      "unknown": "An unknown error occurred."
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "DeepSeek is already configured.",
-      "reauth_successful": "Re-authentication successful."
+      "already_configured": "Account is already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Configure DeepSeek",
-        "description": "Update DeepSeek configuration.",
+        "title": "DeepSeek options",
+        "description": "Update DeepSeek parameters and optionally expose Home Assistant devices to the assistant.",
         "data": {
-          "api_key": "API Key",
-          "model": "Model",
-          "base_url": "Base URL",
-          "max_tokens": "Max Tokens",
+          "prompt": "Instructions",
+          "llm_hass_api": "Control Home Assistant",
+          "chat_model": "Chat model",
+          "max_tokens": "Maximum tokens to return in response",
           "temperature": "Temperature",
-          "show_reasoning": "Show Reasoning"
-        }
-      }
-    }
-  },
-  "services": {
-    "chat": {
-      "name": "Chat",
-      "description": "Send a message to DeepSeek and get a response.",
-      "fields": {
-        "message": {
-          "name": "Message",
-          "description": "The message to send to DeepSeek."
-        },
-        "conversation_id": {
-          "name": "Conversation ID",
-          "description": "Optional conversation ID for maintaining context."
-        }
-      }
-    },
-    "summarize": {
-      "name": "Summarize",
-      "description": "Summarize text using DeepSeek.",
-      "fields": {
-        "text": {
-          "name": "Text",
-          "description": "The text to summarize."
-        },
-        "max_length": {
-          "name": "Max Length",
-          "description": "Maximum length of summary in words."
-        }
-      }
-    },
-    "translate": {
-      "name": "Translate",
-      "description": "Translate text using DeepSeek.",
-      "fields": {
-        "text": {
-          "name": "Text",
-          "description": "The text to translate."
-        },
-        "target_language": {
-          "name": "Target Language",
-          "description": "Language to translate to (e.g., 'Spanish', 'French')."
-        },
-        "source_language": {
-          "name": "Source Language",
-          "description": "Source language (default: 'auto' for auto-detection)."
+          "top_p": "Top P"
         }
       }
     }
