@@ -1,4 +1,5 @@
 """Global fixtures for DeepSeek integration tests."""
+
 from __future__ import annotations
 
 import pytest

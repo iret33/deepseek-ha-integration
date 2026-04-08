@@ -1,4 +1,5 @@
 """Fixtures for DeepSeek tests."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator

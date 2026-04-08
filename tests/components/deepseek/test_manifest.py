@@ -1,4 +1,5 @@
 """Smoke tests for the DeepSeek integration."""
+
 from __future__ import annotations
 
 import json

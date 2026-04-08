@@ -162,7 +162,8 @@ def _options_schema(
         SelectOptionDict(label="No control", value="none")
     ]
     hass_apis.extend(
-        SelectOptionDict(label=api.name, value=api.id) for api in llm.async_get_apis(hass)
+        SelectOptionDict(label=api.name, value=api.id)
+        for api in llm.async_get_apis(hass)
     )
 
     schema: VolDictType = {
