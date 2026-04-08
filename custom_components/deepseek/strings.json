@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to DeepSeek",
-        "description": "Enter your DeepSeek API key. Get one at https://platform.deepseek.com/api-keys",
+        "description": "Enter your DeepSeek API key. Get one at {api_keys_url}",
         "data": {
           "api_key": "API key",
           "name": "Name"

@@ -81,7 +81,11 @@ class DeepSeekConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         if user_input is None:
             return self.async_show_form(
-                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
+                step_id="user",
+                data_schema=STEP_USER_DATA_SCHEMA,
+                description_placeholders={
+                    "api_keys_url": "https://platform.deepseek.com/api-keys"
+                },
             )
 
         errors: dict[str, str] = {}
@@ -102,7 +106,12 @@ class DeepSeekConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="user",
+            data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
+            description_placeholders={
+                "api_keys_url": "https://platform.deepseek.com/api-keys"
+            },
         )
 
     @staticmethod
