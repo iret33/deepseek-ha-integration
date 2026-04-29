@@ -189,17 +189,13 @@ def _options_schema(
         ): TemplateSelector(),
         vol.Optional(
             CONF_LLM_HASS_API,
-            description={
-                "suggested_value": options.get(CONF_LLM_HASS_API, "none")
-            },
+            description={"suggested_value": options.get(CONF_LLM_HASS_API, "none")},
             default="none",
         ): SelectSelector(SelectSelectorConfig(options=hass_apis)),
         vol.Optional(
             CONF_MAX_TOKENS,
             default=options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS),
-        ): NumberSelector(
-            NumberSelectorConfig(min=64, max=8192, step=64, mode="box")
-        ),
+        ): NumberSelector(NumberSelectorConfig(min=64, max=8192, step=64, mode="box")),
         vol.Optional(
             CONF_TEMPERATURE,
             default=options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE),
