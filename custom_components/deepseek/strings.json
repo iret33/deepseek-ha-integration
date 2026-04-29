@@ -3,43 +3,33 @@
     "step": {
       "user": {
         "title": "Connect to DeepSeek",
-        "description": "Enter your DeepSeek API key. Get one at {api_keys_url}",
+        "description": "Enter your DeepSeek API key and pick the model you'd like to use. Get an API key at {api_keys_url}.",
         "data": {
           "api_key": "API key",
-          "name": "Name"
-        }
-      },
-      "options": {
-        "title": "Configure DeepSeek",
-        "description": "Choose the DeepSeek model and parameters.",
-        "data": {
-          "model": "Model",
-          "base_url": "Base URL",
-          "max_tokens": "Maximum tokens",
-          "temperature": "Temperature",
-          "show_reasoning": "Show reasoning (deepseek-reasoner only)"
+          "chat_model": "Model",
+          "base_url": "API base URL"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Failed to reach api.deepseek.com — check your network.",
+      "invalid_auth": "DeepSeek rejected the API key.",
+      "unknown": "Unexpected error — see Home Assistant logs."
     },
     "abort": {
-      "already_configured": "Account is already configured"
+      "already_configured": "DeepSeek is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "DeepSeek options",
-        "description": "Update DeepSeek parameters and optionally expose Home Assistant devices to the assistant.",
+        "description": "Tune model selection and conversation parameters at any time.",
         "data": {
+          "chat_model": "Model",
           "prompt": "Instructions",
           "llm_hass_api": "Control Home Assistant",
-          "chat_model": "Chat model",
-          "max_tokens": "Maximum tokens to return in response",
+          "max_tokens": "Maximum tokens",
           "temperature": "Temperature",
           "top_p": "Top P"
         }

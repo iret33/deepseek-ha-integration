@@ -9,7 +9,7 @@ import openai
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.typing import ConfigType
@@ -25,7 +25,7 @@ type DeepSeekConfigEntry = ConfigEntry[openai.AsyncOpenAI]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the DeepSeek integration."""
+    """Set up the DeepSeek integration (no YAML)."""
     return True
 
 
@@ -40,9 +40,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeepSeekConfigEntry) -> 
     try:
         await client.with_options(timeout=10.0).models.list()
     except openai.AuthenticationError as err:
-        _LOGGER.error("Invalid DeepSeek API key: %s", err)
-        return False
+        # Wrong / revoked API key — prompt the user to reconfigure rather
+        # than silently failing the integration.
+        raise ConfigEntryAuthFailed("Invalid DeepSeek API key") from err
     except openai.OpenAIError as err:
+        # Transient network / upstream issue — let HA retry the setup.
         raise ConfigEntryNotReady(str(err)) from err
 
     entry.runtime_data = client
