@@ -35,5 +35,41 @@
         }
       }
     }
+  },
+  "services": {
+    "generate": {
+      "name": "Generate text",
+      "description": "Send a prompt to DeepSeek and return the response.",
+      "fields": {
+        "config_entry": {
+          "name": "Config entry",
+          "description": "DeepSeek entry to use. Leave empty to use the first one."
+        },
+        "prompt": {
+          "name": "Prompt",
+          "description": "The user message sent to the model."
+        },
+        "system_prompt": {
+          "name": "System prompt",
+          "description": "Optional system instructions placed before the prompt."
+        },
+        "model": {
+          "name": "Model",
+          "description": "Override the model configured for this entry."
+        },
+        "max_tokens": {
+          "name": "Max tokens",
+          "description": "Maximum tokens to generate in the reply."
+        },
+        "temperature": {
+          "name": "Temperature",
+          "description": "Sampling temperature (0 = deterministic, 2 = very random)."
+        },
+        "top_p": {
+          "name": "Top P",
+          "description": "Nucleus sampling threshold."
+        }
+      }
+    }
   }
 }

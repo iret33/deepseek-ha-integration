@@ -64,112 +64,103 @@ Once installed, DeepSeek becomes available as a conversation agent:
 - **Chat Interface**: Use the chat feature in Home Assistant
 - **Automations**: Trigger DeepSeek responses in automations
 
-### Services
+### Service: `deepseek.generate`
 
-The integration provides these services:
+Use DeepSeek as a building block in automations, scripts, and other integrations. The service takes a prompt and returns the model's reply, which you can capture into a variable with `response_variable` and use in subsequent steps.
 
-#### `deepseek.chat`
-Send a message to DeepSeek and get a response.
+#### Fields
 
-```yaml
-service: deepseek.chat
-data:
-  message: "What's the weather like today?"
-  conversation_id: "optional_conversation_id"
-```
+| Field           | Type   | Required | Description                                                                 |
+| --------------- | ------ | -------- | --------------------------------------------------------------------------- |
+| `prompt`        | string | yes      | The user message sent to the model.                                         |
+| `system_prompt` | string | no       | Optional system instructions placed before the prompt.                      |
+| `model`         | string | no       | Override the model configured for this entry (`deepseek-v4-flash`, etc.).   |
+| `max_tokens`    | int    | no       | Maximum tokens to generate (1–8192).                                        |
+| `temperature`   | float  | no       | Sampling temperature (0–2).                                                 |
+| `top_p`         | float  | no       | Nucleus sampling threshold (0–1).                                           |
+| `config_entry`  | string | no       | Specific DeepSeek entry to use, when more than one is configured.           |
 
-Response data includes:
-- `response`: The AI's response
-- `conversation_id`: Conversation ID for context
-- `tokens_used`: Number of tokens used
-- `reasoning`: Reasoning steps (if enabled)
-
-#### `deepseek.summarize`
-Summarize text using DeepSeek.
+#### Response
 
 ```yaml
-service: deepseek.summarize
-data:
-  text: "Long article text here..."
-  max_length: 100
+text: "The model's reply..."
+model: "deepseek-v4-flash"
+finish_reason: "stop"
+usage:
+  prompt_tokens: 24
+  completion_tokens: 86
+  total_tokens: 110
 ```
 
-#### `deepseek.translate`
-Translate text using DeepSeek.
+#### Example: morning weather summary
 
-```yaml
-service: deepseek.translate
-data:
-  text: "Hello, how are you?"
-  target_language: "Spanish"
-  source_language: "auto"
-```
-
-### Example Automations
-
-#### Weather Summary
 ```yaml
 automation:
-  - alias: "Morning weather summary"
+  - alias: Morning weather summary
     trigger:
-      platform: time
-      at: "07:00:00"
+      - platform: time
+        at: "07:00:00"
     action:
-      - service: weather.get_forecast
-        target:
-          entity_id: weather.home
+      - service: deepseek.generate
         data:
-          type: daily
-      - service: deepseek.chat
+          system_prompt: >-
+            You are a concise weather presenter. Reply in one short sentence.
+          prompt: >-
+            Today's forecast: {{ states('weather.home') }},
+            high {{ state_attr('weather.home', 'temperature') }}°C,
+            wind {{ state_attr('weather.home', 'wind_speed') }} km/h.
+        response_variable: weather_reply
+      - service: notify.mobile_app
         data:
-          message: >
-            Summarize today's weather forecast: {{ states.weather.home.attributes.forecast[0] }}
+          message: "{{ weather_reply.text }}"
 ```
 
-#### Smart Home Control via Chat
+#### Example: smart device-status update
+
 ```yaml
-automation:
-  - alias: "Process DeepSeek home control requests"
-    trigger:
-      platform: event
-      event_type: conversation_result
-      event_data:
-        agent_id: deepseek
-    action:
-      - choose:
-          - conditions:
-              - "{{ 'turn on' in trigger.event.data.response|lower }}"
-            sequence:
-              - service: light.turn_on
-                target:
-                  entity_id: light.living_room
+script:
+  living_room_status:
+    sequence:
+      - service: deepseek.generate
+        data:
+          model: deepseek-v4-pro
+          temperature: 0.3
+          prompt: >-
+            Lights: {{ states('light.living_room') }}.
+            Temperature: {{ states('sensor.living_room_temperature') }}°C.
+            Write a friendly one-line status update for the living room.
+        response_variable: status
+      - service: tts.cloud_say
+        data:
+          entity_id: media_player.living_room
+          message: "{{ status.text }}"
 ```
+
+You can also call the service directly from **Developer Tools → Actions** to test prompts and see the full response object.
 
 ## Models
 
 ### Available Models
 
-1. **`deepseek-chat`** (Default)
-   - General purpose chat model
-   - 128K context window
-   - Best for everyday conversations
+1. **`deepseek-v4-flash`** (Default)
+   - Current generation, fast and inexpensive
+   - 1M token context window
+   - Supports tool calling — best for everyday conversations and Assist
+2. **`deepseek-v4-pro`**
+   - Higher capability, larger model
+   - 1M token context window, also supports tool calling
+   - Best for complex reasoning and longer prompts
+3. **`deepseek-chat`** *(deprecated — kept for existing entries)*
+4. **`deepseek-reasoner`** *(deprecated — kept for existing entries)*
 
-2. **`deepseek-reasoner`**
-   - Chain-of-thought reasoning
-   - Shows reasoning steps (optional)
-   - Best for complex problem solving
+DeepSeek announced the deprecation of `deepseek-chat` and `deepseek-reasoner` for **2026-07-24**. The integration keeps them in the dropdown so existing config entries don't break, but new installs default to `deepseek-v4-flash`.
 
-3. **`deepseek-coder`**
-   - Specialized for code generation
-   - Best for programming tasks
+### Model selection tips
 
-### Model Selection Tips
-
-- **General Use**: `deepseek-chat`
-- **Complex Questions**: `deepseek-reasoner` with reasoning enabled
-- **Programming Help**: `deepseek-coder`
-- **Creative Tasks**: Higher temperature (0.8-1.2)
-- **Precise Tasks**: Lower temperature (0.2-0.5)
+- **General use / Assist**: `deepseek-v4-flash`
+- **Complex reasoning, larger prompts**: `deepseek-v4-pro`
+- **Creative tasks**: higher temperature (0.8–1.2)
+- **Precise / factual tasks**: lower temperature (0.2–0.5)
 
 ## Troubleshooting
 

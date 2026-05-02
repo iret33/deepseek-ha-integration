@@ -1,0 +1,72 @@
+generate:
+  name: Generate text
+  description: >-
+    Send a prompt to DeepSeek and return the response. Use response_variable
+    to capture the reply for use in subsequent automation steps.
+  fields:
+    config_entry:
+      name: Config entry
+      description: >-
+        DeepSeek config entry to use. Leave empty to use the first one.
+      required: false
+      advanced: true
+      selector:
+        config_entry:
+          integration: deepseek
+    prompt:
+      name: Prompt
+      description: The user message to send to the model.
+      required: true
+      example: Summarize today's weather forecast in one short sentence.
+      selector:
+        text:
+          multiline: true
+    system_prompt:
+      name: System prompt
+      description: Optional system instructions placed before the prompt.
+      required: false
+      example: You are a concise weather summariser.
+      selector:
+        text:
+          multiline: true
+    model:
+      name: Model
+      description: Override the model configured for this entry.
+      required: false
+      selector:
+        select:
+          custom_value: true
+          options:
+            - "deepseek-v4-flash"
+            - "deepseek-v4-pro"
+            - "deepseek-chat"
+            - "deepseek-reasoner"
+    max_tokens:
+      name: Max tokens
+      description: Maximum tokens to generate in the reply.
+      required: false
+      example: 1024
+      selector:
+        number:
+          min: 1
+          max: 8192
+          step: 1
+          mode: box
+    temperature:
+      name: Temperature
+      description: Sampling temperature (0 = deterministic, 2 = very random).
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 2
+          step: 0.05
+    top_p:
+      name: Top P
+      description: Nucleus sampling threshold.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05

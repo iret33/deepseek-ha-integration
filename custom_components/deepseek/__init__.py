@@ -15,6 +15,7 @@ from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_BASE_URL, DEFAULT_BASE_URL, DOMAIN
+from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ type DeepSeekConfigEntry = ConfigEntry[openai.AsyncOpenAI]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the DeepSeek integration (no YAML)."""
+    async_setup_services(hass)
     return True
 
 
@@ -56,7 +58,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeepSeekConfigEntry) -> 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DeepSeekConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        async_unload_services(hass)
+    return unloaded
 
 
 async def _async_update_listener(
