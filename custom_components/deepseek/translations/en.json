@@ -9,6 +9,13 @@
           "chat_model": "Model",
           "base_url": "API base URL"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate DeepSeek",
+        "description": "Your DeepSeek API key is no longer valid. Generate a new one at {api_keys_url} and paste it below.",
+        "data": {
+          "api_key": "API key"
+        }
       }
     },
     "error": {
@@ -17,7 +24,8 @@
       "unknown": "Unexpected error — see Home Assistant logs."
     },
     "abort": {
-      "already_configured": "DeepSeek is already configured."
+      "already_configured": "DeepSeek is already configured.",
+      "reauth_successful": "DeepSeek re-authenticated successfully."
     }
   },
   "options": {

@@ -134,6 +134,50 @@ class DeepSeekConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
+        """Triggered by HA when the stored API key stops working."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Re-collect the API key from the user."""
+        reauth_schema = vol.Schema({vol.Required(CONF_API_KEY): str})
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="reauth_confirm",
+                data_schema=reauth_schema,
+                description_placeholders={
+                    "api_keys_url": "https://platform.deepseek.com/api_keys"
+                },
+            )
+
+        entry = self._get_reauth_entry()
+        new_data = {**entry.data, CONF_API_KEY: user_input[CONF_API_KEY]}
+
+        errors: dict[str, str] = {}
+        try:
+            await _validate_api_key(self.hass, new_data)
+        except openai.AuthenticationError:
+            errors["base"] = "invalid_auth"
+        except (openai.APIConnectionError, openai.APITimeoutError):
+            errors["base"] = "cannot_connect"
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Unexpected error during DeepSeek reauth")
+            errors["base"] = "unknown"
+        else:
+            return self.async_update_reload_and_abort(entry, data=new_data)
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=reauth_schema,
+            errors=errors,
+            description_placeholders={
+                "api_keys_url": "https://platform.deepseek.com/api_keys"
+            },
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
