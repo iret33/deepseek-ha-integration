@@ -22,7 +22,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libturbojpeg0
+          sudo apt-get install -y libturbojpeg
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
