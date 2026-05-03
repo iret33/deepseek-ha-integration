@@ -19,7 +19,15 @@ from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: tuple[Platform, ...] = (Platform.AI_TASK, Platform.CONVERSATION)
+# AI Task was added in HA 2025.7. On older Home Assistant cores the
+# Platform.AI_TASK enum value doesn't exist, so add it conditionally —
+# users on older HA still get the conversation entity and the
+# `deepseek.generate` service; the AI Task entity is opted in only
+# when the host HA supports it.
+PLATFORMS: tuple[Platform, ...] = (
+    *((Platform.AI_TASK,) if hasattr(Platform, "AI_TASK") else ()),
+    Platform.CONVERSATION,
+)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type DeepSeekConfigEntry = ConfigEntry[openai.AsyncOpenAI]
