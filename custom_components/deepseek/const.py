@@ -23,19 +23,25 @@ CONF_PROMPT: Final = "prompt"
 DEFAULT_NAME: Final = "DeepSeek"
 DEFAULT_BASE_URL: Final = "https://api.deepseek.com"
 
-# Model catalogue. Order matters — the first entry is the default and the
-# one shown selected when the user opens the picker. `deepseek-v4-flash`
-# and `deepseek-v4-pro` are the current generation; `deepseek-chat` and
-# `deepseek-reasoner` are deprecated (per DeepSeek API docs, 2026-07-24)
-# but still functional and kept for users with existing config entries.
+# Model catalogue. Order matters — the first entry is the default the
+# picker shows on a fresh install. `deepseek-chat` and `deepseek-reasoner`
+# are pinned to *non-thinking* mode and work cleanly with the plain
+# chat-completions API this integration uses. The newer `deepseek-v4-*`
+# models default to *thinking* mode, which streams a `reasoning_content`
+# field that has to be re-fed on follow-up turns; this integration does
+# not yet round-trip that field, so picking a v4 model produces a
+# 400 ("reasoning_content in the thinking mode must be passed back") on
+# multi-turn conversations. Until reasoning_content support lands, the
+# v4 names are kept in the dropdown for users who want to opt in but
+# the default points at `deepseek-chat`.
 MODELS: Final = [
-    "deepseek-v4-flash",
-    "deepseek-v4-pro",
     "deepseek-chat",
     "deepseek-reasoner",
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
 ]
 
-RECOMMENDED_CHAT_MODEL: Final = "deepseek-v4-flash"
+RECOMMENDED_CHAT_MODEL: Final = "deepseek-chat"
 RECOMMENDED_MAX_TOKENS: Final = 2048
 RECOMMENDED_TEMPERATURE: Final = 0.7
 RECOMMENDED_TOP_P: Final = 1.0

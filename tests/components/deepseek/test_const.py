@@ -37,7 +37,7 @@ def test_constants() -> None:
 
     # Defaults / recommended values.
     assert DEFAULT_BASE_URL == "https://api.deepseek.com"
-    assert RECOMMENDED_CHAT_MODEL == "deepseek-v4-flash"
+    assert RECOMMENDED_CHAT_MODEL == "deepseek-chat"
     assert RECOMMENDED_MAX_TOKENS == 2048
     assert 0.0 <= RECOMMENDED_TEMPERATURE <= 2.0
     assert 0.0 <= RECOMMENDED_TOP_P <= 1.0

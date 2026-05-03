@@ -3,7 +3,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Official DeepSeek AI integration for Home Assistant. Bring the power of DeepSeek's advanced language models to your smart home.
+A community Home Assistant integration that brings the DeepSeek API to your smart home — conversation agent plus a `deepseek.generate` service for automations. Not affiliated with DeepSeek.
 
 ## Features
 
@@ -142,23 +142,21 @@ You can also call the service directly from **Developer Tools → Actions** to t
 
 ### Available Models
 
-1. **`deepseek-v4-flash`** (Default)
-   - Current generation, fast and inexpensive
-   - 1M token context window
-   - Supports tool calling — best for everyday conversations and Assist
-2. **`deepseek-v4-pro`**
-   - Higher capability, larger model
-   - 1M token context window, also supports tool calling
-   - Best for complex reasoning and longer prompts
-3. **`deepseek-chat`** *(deprecated — kept for existing entries)*
-4. **`deepseek-reasoner`** *(deprecated — kept for existing entries)*
+1. **`deepseek-chat`** (Default)
+   - DeepSeek-V3-class model in non-thinking mode — works cleanly with this integration's plain chat-completions API.
+   - Recommended for everyday conversations and Assist tool calling.
+2. **`deepseek-reasoner`**
+   - DeepSeek-R1-class model in non-thinking mode.
+   - Reasonable choice for harder questions where you want the larger model.
+3. **`deepseek-v4-flash`** *(advanced — opt-in, see caveat below)*
+4. **`deepseek-v4-pro`** *(advanced — opt-in, see caveat below)*
 
-DeepSeek announced the deprecation of `deepseek-chat` and `deepseek-reasoner` for **2026-07-24**. The integration keeps them in the dropdown so existing config entries don't break, but new installs default to `deepseek-v4-flash`.
+> **Caveat for the `deepseek-v4-*` models:** these run in DeepSeek's *thinking* mode by default and stream a `reasoning_content` field that must be re-fed on every follow-up turn. This integration does not yet round-trip that field, so multi-turn conversations with a v4 model fail with `400 — reasoning_content in the thinking mode must be passed back to the API`. Stick to `deepseek-chat` / `deepseek-reasoner` until v4 thinking-mode support lands.
 
 ### Model selection tips
 
-- **General use / Assist**: `deepseek-v4-flash`
-- **Complex reasoning, larger prompts**: `deepseek-v4-pro`
+- **General use / Assist**: `deepseek-chat`
+- **Complex reasoning**: `deepseek-reasoner`
 - **Creative tasks**: higher temperature (0.8–1.2)
 - **Precise / factual tasks**: lower temperature (0.2–0.5)
 
@@ -249,9 +247,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Built by DeepSeek for the Home Assistant community
-- Uses the official OpenAI Python client
-- Thanks to all contributors and testers
+- Community-built integration, not affiliated with DeepSeek.
+- Uses the OpenAI Python client against the DeepSeek-compatible API at `https://api.deepseek.com`.
+- Thanks to all contributors and testers.
 
 ---
 
