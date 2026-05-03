@@ -167,73 +167,91 @@ class DeepSeekConversationEntity(
         except conversation.ConverseError as err:
             return err.as_conversation_result()
 
-        await self._async_run_chat_loop(chat_log)
+        await run_chat_loop(
+            client=self.entry.runtime_data,
+            options=self.entry.options,
+            chat_log=chat_log,
+            agent_id=self.entity_id,
+        )
         return conversation.async_get_result_from_chat_log(user_input, chat_log)
 
-    async def _async_run_chat_loop(self, chat_log: conversation.ChatLog) -> None:
-        """Run chat-completion calls until the model stops requesting tools."""
-        client: openai.AsyncOpenAI = self.entry.runtime_data
-        options = self.entry.options
-        agent_id = self.entity_id
 
-        tools: list[ChatCompletionToolParam] | None = None
-        if chat_log.llm_api:
-            tools = [
-                _format_tool(t, chat_log.llm_api.custom_serializer)
-                for t in chat_log.llm_api.tools
-            ]
+async def run_chat_loop(
+    client: openai.AsyncOpenAI,
+    options: Any,
+    chat_log: conversation.ChatLog,
+    agent_id: str,
+    *,
+    force_json: bool = False,
+) -> None:
+    """Drive DeepSeek chat-completion calls against an HA chat_log.
 
-        for _ in range(MAX_TOOL_ITERATIONS):
-            messages = _content_to_messages(chat_log.content)
+    Shared by the conversation entity and the AI Task entity. Loops until
+    the model stops requesting tools or MAX_TOOL_ITERATIONS is hit. When
+    `force_json=True`, instructs DeepSeek to respond in JSON via
+    response_format — used by AI Task structured-data generation.
+    """
+    tools: list[ChatCompletionToolParam] | None = None
+    if chat_log.llm_api:
+        tools = [
+            _format_tool(t, chat_log.llm_api.custom_serializer)
+            for t in chat_log.llm_api.tools
+        ]
 
-            try:
-                result = await client.chat.completions.create(
-                    model=options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
-                    messages=messages,
-                    tools=tools or NOT_GIVEN,
-                    max_tokens=int(
-                        options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
-                    ),
-                    top_p=float(options.get(CONF_TOP_P, RECOMMENDED_TOP_P)),
-                    temperature=float(
-                        options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
-                    ),
-                    user=chat_log.conversation_id,
-                )
-            except openai.OpenAIError as err:
-                LOGGER.error("Error talking to DeepSeek: %s", err)
-                raise HomeAssistantError(f"DeepSeek API error: {err}") from err
+    extra_kwargs: dict[str, Any] = {}
+    if force_json:
+        extra_kwargs["response_format"] = {"type": "json_object"}
 
-            response = result.choices[0].message
-            tool_inputs: list[llm.ToolInput] = []
-            if response.tool_calls:
-                for call in response.tool_calls:
-                    try:
-                        args = json.loads(call.function.arguments or "{}")
-                    except json.JSONDecodeError:
-                        args = {}
-                    tool_inputs.append(
-                        llm.ToolInput(
-                            id=call.id,
-                            tool_name=call.function.name,
-                            tool_args=args,
-                        )
-                    )
+    for _ in range(MAX_TOOL_ITERATIONS):
+        messages = _content_to_messages(chat_log.content)
 
-            assistant_content = conversation.AssistantContent(
-                agent_id=agent_id,
-                content=response.content or None,
-                tool_calls=tool_inputs or None,
+        try:
+            result = await client.chat.completions.create(
+                model=options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
+                messages=messages,
+                tools=tools or NOT_GIVEN,
+                max_tokens=int(options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)),
+                top_p=float(options.get(CONF_TOP_P, RECOMMENDED_TOP_P)),
+                temperature=float(
+                    options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+                ),
+                user=chat_log.conversation_id,
+                **extra_kwargs,
             )
+        except openai.OpenAIError as err:
+            LOGGER.error("Error talking to DeepSeek: %s", err)
+            raise HomeAssistantError(f"DeepSeek API error: {err}") from err
 
-            if not tool_inputs:
-                chat_log.async_add_assistant_content_without_tools(assistant_content)
-                return
+        response = result.choices[0].message
+        tool_inputs: list[llm.ToolInput] = []
+        if response.tool_calls:
+            for call in response.tool_calls:
+                try:
+                    args = json.loads(call.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                tool_inputs.append(
+                    llm.ToolInput(
+                        id=call.id,
+                        tool_name=call.function.name,
+                        tool_args=args,
+                    )
+                )
 
-            # `async_add_assistant_content` is an async generator that
-            # executes the requested tool calls and yields each result.
-            async for _ in chat_log.async_add_assistant_content(assistant_content):
-                pass
+        assistant_content = conversation.AssistantContent(
+            agent_id=agent_id,
+            content=response.content or None,
+            tool_calls=tool_inputs or None,
+        )
 
-            if not chat_log.unresponded_tool_results:
-                return
+        if not tool_inputs:
+            chat_log.async_add_assistant_content_without_tools(assistant_content)
+            return
+
+        # `async_add_assistant_content` is an async generator that
+        # executes the requested tool calls and yields each result.
+        async for _ in chat_log.async_add_assistant_content(assistant_content):
+            pass
+
+        if not chat_log.unresponded_tool_results:
+            return

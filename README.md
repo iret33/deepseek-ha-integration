@@ -64,7 +64,62 @@ Once installed, DeepSeek becomes available as a conversation agent:
 - **Chat Interface**: Use the chat feature in Home Assistant
 - **Automations**: Trigger DeepSeek responses in automations
 
-### Service: `deepseek.generate`
+### AI Task entity *(recommended)*
+
+The integration registers a Home Assistant **AI Task** entity so it can be selected from the AI-Task picker in the visual automation editor and used with the standard `ai_task.generate_data` action. This is the recommended way to integrate DeepSeek into modern automations.
+
+#### Plain-text generation
+
+```yaml
+- action: ai_task.generate_data
+  data:
+    task_name: weather_summary
+    instructions: >-
+      Today's forecast: {{ states('weather.home') }},
+      high {{ state_attr('weather.home', 'temperature') }}°C.
+      Summarise it in one short sentence.
+    entity_id: ai_task.deepseek
+  response_variable: result
+- action: notify.mobile_app
+  data:
+    message: "{{ result.data }}"
+```
+
+#### Structured (JSON) output
+
+Pass a `structure:` schema and the integration will set DeepSeek's `response_format=json_object`, so the model replies with parseable JSON, which the framework returns as a dict in `result.data`.
+
+```yaml
+- action: ai_task.generate_data
+  data:
+    task_name: forecast_extract
+    instructions: >-
+      From this forecast — {{ states('weather.home') }} — produce
+      structured data.
+    entity_id: ai_task.deepseek
+    structure:
+      summary:
+        selector:
+          text:
+      high_c:
+        selector:
+          number:
+      rain_chance_percent:
+        selector:
+          number:
+  response_variable: result
+- action: persistent_notification.create
+  data:
+    message: "{{ result.data.summary }} (rain {{ result.data.rain_chance_percent }}%)"
+```
+
+If DeepSeek returns something that isn't valid JSON for a structured task, the automation step fails with a clear `DeepSeek returned a non-JSON response for a structured task` error rather than silently mis-parsing.
+
+### Service: `deepseek.generate` *(legacy alternative)*
+
+For one-off prompts or when you don't want a target entity, the `deepseek.generate` action is still available and unchanged. The AI Task entity above is the recommended path going forward.
+
+
 
 Use DeepSeek as a building block in automations, scripts, and other integrations. The service takes a prompt and returns the model's reply, which you can capture into a variable with `response_variable` and use in subsequent steps.
 

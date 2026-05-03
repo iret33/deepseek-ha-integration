@@ -19,7 +19,7 @@ from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: tuple[Platform, ...] = (Platform.CONVERSATION,)
+PLATFORMS: tuple[Platform, ...] = (Platform.AI_TASK, Platform.CONVERSATION)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type DeepSeekConfigEntry = ConfigEntry[openai.AsyncOpenAI]
