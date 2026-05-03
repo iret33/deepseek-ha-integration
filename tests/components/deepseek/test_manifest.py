@@ -41,7 +41,7 @@ def test_module_imports() -> None:
     from custom_components.deepseek import config_flow, const, conversation
 
     assert const.DOMAIN == "deepseek"
-    assert const.DEFAULT_MODEL in const.MODELS
+    assert const.RECOMMENDED_CHAT_MODEL in const.MODELS
     assert hasattr(deepseek_pkg, "async_setup_entry")
     assert hasattr(deepseek_pkg, "async_unload_entry")
     assert hasattr(conversation, "async_setup_entry")
