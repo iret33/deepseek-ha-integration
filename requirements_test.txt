@@ -14,3 +14,4 @@ ha-ffmpeg>=3.2.0
 pymicro-vad>=1.0.0
 pyspeex-noise>=1.0.0
 webrtc-noise-gain>=1.2.0
+PyTurboJPEG>=1.7.0

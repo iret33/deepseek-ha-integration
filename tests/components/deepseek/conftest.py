@@ -16,9 +16,16 @@ from custom_components.deepseek.const import DOMAIN
 
 @pytest.fixture(autouse=True)
 async def _setup_ha_core(hass: HomeAssistant) -> None:
-    """Set up the homeassistant core component so conversation can load."""
+    """Pre-load the components our integration depends on.
+
+    The integration declares two platforms (conversation, ai_task), so HA
+    tries to set up both when our config entry loads. Bringing them up
+    here means the test harness has stable state by the time our entry
+    forwards platforms.
+    """
     await async_setup_component(hass, "homeassistant", {})
     await async_setup_component(hass, "conversation", {})
+    await async_setup_component(hass, "ai_task", {})
 
 
 @pytest.fixture
@@ -29,7 +36,7 @@ def mock_config_entry() -> MockConfigEntry:
         title="DeepSeek",
         data={"api_key": "sk-test", "base_url": "https://api.deepseek.com"},
         options={
-            "chat_model": "deepseek-v4-flash",
+            "chat_model": "deepseek-chat",
             "prompt": "You are a helpful assistant.",
             "max_tokens": 2048,
             "temperature": 0.7,
