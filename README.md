@@ -9,8 +9,8 @@ A community Home Assistant integration that brings the DeepSeek API to your smar
 
 - **🤖 Conversation Agent**: Use DeepSeek as your Home Assistant voice/chat assistant
 - **🔧 Config Flow**: Easy UI-based setup - no YAML required
-- **🎯 Multiple Models**: Support for `deepseek-chat`, `deepseek-reasoner`, `deepseek-coder`
-- **💭 Reasoning Support**: Optional reasoning display with `deepseek-reasoner` model
+- **🎯 Multiple Models**: `deepseek-v4-flash` and `deepseek-v4-pro`
+- **💭 Thinking Mode**: Optional reasoning (`high` / `max`), including with Assist tool calls
 - **🌐 Multi-language**: Support for all languages DeepSeek understands
 - **⚡ Fast & Efficient**: Async implementation with proper error handling
 - **🔌 OpenAI-Compatible**: Uses DeepSeek's OpenAI-compatible API
@@ -48,10 +48,10 @@ A community Home Assistant integration that brings the DeepSeek API to your smar
 1. **Add Integration**: Go to Settings → Devices & Services → Add Integration → Search "DeepSeek"
 2. **Enter API Key**: Paste your DeepSeek API key
 3. **Configure Options** (optional):
-   - **Model**: Choose between `deepseek-chat`, `deepseek-reasoner`, or `deepseek-coder`
+   - **Model**: `deepseek-v4-flash` (default) or `deepseek-v4-pro`
+   - **Thinking**: `Off` (default), `High` or `Max`
    - **Max Tokens**: Response length limit (default: 2048)
-   - **Temperature**: Creativity level (0.0-2.0, default: 0.7)
-   - **Show Reasoning**: Display reasoning steps (only for `deepseek-reasoner`)
+   - **Temperature**: Creativity level (0.0-2.0, default: 0.7; ignored while thinking)
 4. **Complete**: The integration is now ready!
 
 ## Usage
@@ -197,21 +197,31 @@ You can also call the service directly from **Developer Tools → Actions** to t
 
 ### Available Models
 
-1. **`deepseek-chat`** (Default)
-   - DeepSeek-V3-class model in non-thinking mode — works cleanly with this integration's plain chat-completions API.
-   - Recommended for everyday conversations and Assist tool calling.
-2. **`deepseek-reasoner`**
-   - DeepSeek-R1-class model in non-thinking mode.
-   - Reasonable choice for harder questions where you want the larger model.
-3. **`deepseek-v4-flash`** *(advanced — opt-in, see caveat below)*
-4. **`deepseek-v4-pro`** *(advanced — opt-in, see caveat below)*
+1. **`deepseek-v4-flash`** (Default): fast and cheap. Good for everyday conversations and Assist tool calling.
+2. **`deepseek-v4-pro`**: the larger model, for harder questions.
 
-> **Caveat for the `deepseek-v4-*` models:** these run in DeepSeek's *thinking* mode by default and stream a `reasoning_content` field that must be re-fed on every follow-up turn. This integration does not yet round-trip that field, so multi-turn conversations with a v4 model fail with `400 — reasoning_content in the thinking mode must be passed back to the API`. Stick to `deepseek-chat` / `deepseek-reasoner` until v4 thinking-mode support lands.
+### Thinking
+
+DeepSeek V4 models can reason before answering. Set **Thinking** in the integration options (or `reasoning_effort` on the `deepseek.generate` action):
+
+- **Off** (`none`, default): answers directly. Fastest; best for voice control. Temperature and Top P apply.
+- **High** / **Max**: the model reasons first. Slower and uses more tokens, and DeepSeek ignores temperature and Top P. The reasoning is passed back to DeepSeek on follow-up turns, as the API requires.
+
+### Retired model names
+
+DeepSeek retired `deepseek-chat` and `deepseek-reasoner` on 2026-07-24. Both had been aliases for `deepseek-v4-flash`, which is why your usage page showed V4 Flash even with `deepseek-chat` selected. When you update, saved settings are moved over automatically:
+
+| Old model           | New model           | Thinking |
+|---------------------|---------------------|----------|
+| `deepseek-chat`     | `deepseek-v4-flash` | Off      |
+| `deepseek-reasoner` | `deepseek-v4-flash` | High     |
+
+The old names are still accepted by `deepseek.generate` and are translated the same way.
 
 ### Model selection tips
 
-- **General use / Assist**: `deepseek-chat`
-- **Complex reasoning**: `deepseek-reasoner`
+- **General use / Assist**: `deepseek-v4-flash`, thinking off
+- **Complex reasoning**: `deepseek-v4-pro`, or thinking `High`
 - **Creative tasks**: higher temperature (0.8–1.2)
 - **Precise / factual tasks**: lower temperature (0.2–0.5)
 

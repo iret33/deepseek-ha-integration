@@ -20,16 +20,20 @@ from homeassistant.helpers import config_validation as cv
 from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
+    CONF_REASONING_EFFORT,
     CONF_TEMPERATURE,
     CONF_TOP_P,
     DOMAIN,
+    LEGACY_MODELS,
     LOGGER,
     MODELS,
+    REASONING_EFFORTS,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
     RECOMMENDED_TEMPERATURE,
     RECOMMENDED_TOP_P,
 )
+from .helpers import build_request_kwargs
 
 SERVICE_GENERATE = "generate"
 
@@ -37,6 +41,7 @@ ATTR_CONFIG_ENTRY = "config_entry"
 ATTR_PROMPT = "prompt"
 ATTR_SYSTEM_PROMPT = "system_prompt"
 ATTR_MODEL = "model"
+ATTR_REASONING_EFFORT = "reasoning_effort"
 ATTR_MAX_TOKENS = "max_tokens"
 ATTR_TEMPERATURE = "temperature"
 ATTR_TOP_P = "top_p"
@@ -47,7 +52,8 @@ GENERATE_SCHEMA = vol.Schema(
         vol.Optional(ATTR_CONFIG_ENTRY): cv.string,
         vol.Required(ATTR_PROMPT): cv.string,
         vol.Optional(ATTR_SYSTEM_PROMPT): cv.string,
-        vol.Optional(ATTR_MODEL): vol.Any(vol.In(MODELS), cv.string),
+        vol.Optional(ATTR_MODEL): vol.Any(vol.In([*MODELS, *LEGACY_MODELS]), cv.string),
+        vol.Optional(ATTR_REASONING_EFFORT): vol.In(REASONING_EFFORTS),
         vol.Optional(ATTR_MAX_TOKENS): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=8192)
         ),
@@ -96,25 +102,37 @@ async def _async_generate(call: ServiceCall) -> ServiceResponse:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": data[ATTR_PROMPT]})
 
-    model = data.get(ATTR_MODEL) or options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
+    if ATTR_MODEL in data:
+        # A model override carries its own thinking default rather than
+        # inheriting the entry's setting.
+        model = data[ATTR_MODEL]
+        reasoning_effort = data.get(ATTR_REASONING_EFFORT)
+    else:
+        model = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
+        reasoning_effort = data.get(ATTR_REASONING_EFFORT) or options.get(
+            CONF_REASONING_EFFORT
+        )
 
     try:
         result = await client.chat.completions.create(
-            model=model,
             messages=messages,
-            max_tokens=int(
-                data.get(ATTR_MAX_TOKENS)
-                or options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
-            ),
-            temperature=float(
-                data[ATTR_TEMPERATURE]
-                if ATTR_TEMPERATURE in data
-                else options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
-            ),
-            top_p=float(
-                data[ATTR_TOP_P]
-                if ATTR_TOP_P in data
-                else options.get(CONF_TOP_P, RECOMMENDED_TOP_P)
+            **build_request_kwargs(
+                model=model,
+                reasoning_effort=reasoning_effort,
+                max_tokens=int(
+                    data.get(ATTR_MAX_TOKENS)
+                    or options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
+                ),
+                temperature=float(
+                    data[ATTR_TEMPERATURE]
+                    if ATTR_TEMPERATURE in data
+                    else options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+                ),
+                top_p=float(
+                    data[ATTR_TOP_P]
+                    if ATTR_TOP_P in data
+                    else options.get(CONF_TOP_P, RECOMMENDED_TOP_P)
+                ),
             ),
         )
     except openai.OpenAIError as err:

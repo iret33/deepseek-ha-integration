@@ -13,9 +13,12 @@ from custom_components.deepseek.const import (
     DEFAULT_BASE_URL,
     DEFAULT_NAME,
     DOMAIN,
+    LEGACY_MODELS,
     MODELS,
+    REASONING_EFFORTS,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
+    RECOMMENDED_REASONING_EFFORT,
     RECOMMENDED_TEMPERATURE,
     RECOMMENDED_TOP_P,
 )
@@ -37,19 +40,22 @@ def test_constants() -> None:
 
     # Defaults / recommended values.
     assert DEFAULT_BASE_URL == "https://api.deepseek.com"
-    assert RECOMMENDED_CHAT_MODEL == "deepseek-chat"
+    assert RECOMMENDED_CHAT_MODEL == "deepseek-v4-flash"
+    assert RECOMMENDED_REASONING_EFFORT in REASONING_EFFORTS
     assert RECOMMENDED_MAX_TOKENS == 2048
     assert 0.0 <= RECOMMENDED_TEMPERATURE <= 2.0
     assert 0.0 <= RECOMMENDED_TOP_P <= 1.0
 
 
 def test_models_catalogue() -> None:
-    """Model catalogue includes current + deprecated DeepSeek IDs."""
-    assert "deepseek-v4-flash" in MODELS
-    assert "deepseek-v4-pro" in MODELS
-    # Deprecated IDs kept for backward compatibility with existing entries.
-    assert "deepseek-chat" in MODELS
-    assert "deepseek-reasoner" in MODELS
-    # Discontinued IDs must not be offered.
-    assert "deepseek-coder" not in MODELS
+    """Only current DeepSeek IDs are offered; retired ones map onto V4."""
+    assert MODELS == ["deepseek-v4-flash", "deepseek-v4-pro"]
     assert MODELS[0] == RECOMMENDED_CHAT_MODEL
+    # Retired 2026-07-24 — must not be offered, only migrated.
+    for legacy in ("deepseek-chat", "deepseek-reasoner", "deepseek-coder"):
+        assert legacy not in MODELS
+        model, effort = LEGACY_MODELS[legacy]
+        assert model in MODELS
+        assert effort in REASONING_EFFORTS
+    assert LEGACY_MODELS["deepseek-chat"] == ("deepseek-v4-flash", "none")
+    assert LEGACY_MODELS["deepseek-reasoner"] == ("deepseek-v4-flash", "high")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+import dataclasses
 import json
 from typing import Any, Literal
 
@@ -33,6 +34,7 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
+    CONF_REASONING_EFFORT,
     CONF_TEMPERATURE,
     CONF_TOP_P,
     DOMAIN,
@@ -42,10 +44,20 @@ from .const import (
     RECOMMENDED_TEMPERATURE,
     RECOMMENDED_TOP_P,
 )
+from .helpers import build_request_kwargs
 
 # Cap loops where the model keeps issuing tool calls — prevents infinite
 # back-and-forth on a misbehaving plan.
 MAX_TOOL_ITERATIONS = 10
+
+# `AssistantContent.thinking_content` only exists on newer HA cores; on
+# older ones the reasoning simply isn't stored (and thinking-mode tool
+# use will fail upstream, as before).
+_HAS_THINKING_CONTENT = hasattr(
+    conversation, "AssistantContent"
+) and "thinking_content" in {
+    f.name for f in dataclasses.fields(conversation.AssistantContent)
+}
 
 
 async def async_setup_entry(
@@ -86,6 +98,14 @@ def _content_to_messages(
             param = ChatCompletionAssistantMessageParam(
                 role="assistant", content=c.content or ""
             )
+            # DeepSeek thinking mode requires the reasoning of earlier
+            # assistant turns to be sent back, or it rejects the request.
+            if thinking := getattr(c, "thinking_content", None):
+                param["reasoning_content"] = thinking  # type: ignore[typeddict-unknown-key]
+            # External tool calls (e.g. intents HA handled locally) are
+            # kept: their ToolResultContent follows and must stay paired
+            # with a call, and dropping them all used to leave an empty
+            # `tool_calls` array, which DeepSeek rejects with a 400.
             if c.tool_calls:
                 param["tool_calls"] = [
                     ChatCompletionMessageToolCallParam(
@@ -97,7 +117,6 @@ def _content_to_messages(
                         ),
                     )
                     for tc in c.tool_calls
-                    if not tc.external
                 ]
             out.append(param)
         elif isinstance(c, conversation.ToolResultContent):
@@ -207,15 +226,20 @@ async def run_chat_loop(
 
         try:
             result = await client.chat.completions.create(
-                model=options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
                 messages=messages,
                 tools=tools or NOT_GIVEN,
-                max_tokens=int(options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)),
-                top_p=float(options.get(CONF_TOP_P, RECOMMENDED_TOP_P)),
-                temperature=float(
-                    options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
-                ),
                 user=chat_log.conversation_id,
+                **build_request_kwargs(
+                    model=options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
+                    reasoning_effort=options.get(CONF_REASONING_EFFORT),
+                    max_tokens=int(
+                        options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
+                    ),
+                    temperature=float(
+                        options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+                    ),
+                    top_p=float(options.get(CONF_TOP_P, RECOMMENDED_TOP_P)),
+                ),
                 **extra_kwargs,
             )
         except openai.OpenAIError as err:
@@ -238,10 +262,17 @@ async def run_chat_loop(
                     )
                 )
 
+        extra_content: dict[str, Any] = {}
+        if _HAS_THINKING_CONTENT and (
+            reasoning := getattr(response, "reasoning_content", None)
+        ):
+            extra_content["thinking_content"] = reasoning
+
         assistant_content = conversation.AssistantContent(
             agent_id=agent_id,
             content=response.content or None,
             tool_calls=tool_inputs or None,
+            **extra_content,
         )
 
         if not tool_inputs:

@@ -35,11 +35,15 @@
         "description": "Tune model selection and conversation parameters at any time.",
         "data": {
           "chat_model": "Model",
+          "reasoning_effort": "Thinking",
           "prompt": "Instructions",
           "llm_hass_api": "Control Home Assistant",
           "max_tokens": "Maximum tokens",
           "temperature": "Temperature",
           "top_p": "Top P"
+        },
+        "data_description": {
+          "reasoning_effort": "\"none\" answers directly and is best for voice control. \"high\" / \"max\" let the model reason first: slower, uses more tokens, and ignores temperature and top P."
         }
       }
     }
@@ -65,6 +69,10 @@
           "name": "Model",
           "description": "Override the model configured for this entry."
         },
+        "reasoning_effort": {
+          "name": "Thinking",
+          "description": "Thinking mode for this call: none, high or max."
+        },
         "max_tokens": {
           "name": "Max tokens",
           "description": "Maximum tokens to generate in the reply."
@@ -77,6 +85,15 @@
           "name": "Top P",
           "description": "Nucleus sampling threshold."
         }
+      }
+    }
+  },
+  "selector": {
+    "reasoning_effort": {
+      "options": {
+        "none": "Off",
+        "high": "High",
+        "max": "Max"
       }
     }
   }
