@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 import openai
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.config_entries import ConfigEntryState
@@ -46,3 +47,39 @@ async def test_setup_invalid_auth(
     assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
+
+
+@pytest.mark.parametrize(
+    ("old_model", "new_model", "effort"),
+    [
+        ("deepseek-chat", "deepseek-v4-flash", "none"),
+        ("deepseek-reasoner", "deepseek-v4-flash", "high"),
+        ("deepseek-v4-pro", "deepseek-v4-pro", None),
+    ],
+)
+async def test_migrate_retired_models(
+    hass: HomeAssistant,
+    mock_openai_client: AsyncMock,
+    old_model: str,
+    new_model: str,
+    effort: str | None,
+) -> None:
+    """Entries saved with retired model names are moved onto V4."""
+    entry = MockConfigEntry(
+        domain="deepseek",
+        title="DeepSeek",
+        version=1,
+        minor_version=1,
+        data={"api_key": "sk-test"},
+        options={"chat_model": old_model, "temperature": 0.3},
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.minor_version == 2
+    assert entry.options["chat_model"] == new_model
+    assert entry.options.get("reasoning_effort") == effort
+    assert entry.options["temperature"] == 0.3

@@ -34,9 +34,12 @@ def mock_config_entry() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="DeepSeek",
+        version=1,
+        minor_version=2,
         data={"api_key": "sk-test", "base_url": "https://api.deepseek.com"},
         options={
-            "chat_model": "deepseek-chat",
+            "chat_model": "deepseek-v4-flash",
+            "reasoning_effort": "none",
             "prompt": "You are a helpful assistant.",
             "max_tokens": 2048,
             "temperature": 0.7,

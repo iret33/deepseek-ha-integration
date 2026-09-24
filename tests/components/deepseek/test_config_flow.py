@@ -46,6 +46,7 @@ async def test_user_flow_success(
     assert result2["data"]["api_key"] == "sk-valid"
     # Model is captured into options at install so it can be edited later.
     assert result2["options"][CONF_CHAT_MODEL] == RECOMMENDED_CHAT_MODEL
+    assert result2["options"]["reasoning_effort"] == "none"
 
 
 def _auth_error() -> openai.AuthenticationError:
@@ -107,6 +108,7 @@ async def test_options_flow_save(
         result["flow_id"],
         {
             CONF_CHAT_MODEL: "deepseek-v4-pro",
+            "reasoning_effort": "high",
             "prompt": "You are a helpful assistant.",
             CONF_LLM_HASS_API: "none",
             "max_tokens": 1024,
@@ -118,4 +120,5 @@ async def test_options_flow_save(
     # The "none" sentinel is stripped so HA stores the absence of an LLM API.
     assert CONF_LLM_HASS_API not in result2["data"]
     assert result2["data"][CONF_CHAT_MODEL] == "deepseek-v4-pro"
+    assert result2["data"]["reasoning_effort"] == "high"
     assert result2["data"]["temperature"] == 0.5

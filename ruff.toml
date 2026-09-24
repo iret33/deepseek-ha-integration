@@ -1,0 +1,7 @@
+# Match Home Assistant core's import ordering (homeassistant is a
+# separate section, `from x import a, b as c` stays on one line).
+[lint.isort]
+force-sort-within-sections = true
+known-first-party = ["homeassistant"]
+combine-as-imports = true
+split-on-trailing-comma = false

@@ -39,8 +39,18 @@ generate:
           options:
             - "deepseek-v4-flash"
             - "deepseek-v4-pro"
-            - "deepseek-chat"
-            - "deepseek-reasoner"
+    reasoning_effort:
+      name: Thinking
+      description: >-
+        Thinking mode for this call. "none" answers directly; "high" and
+        "max" let the model reason first (slower, uses more tokens).
+      required: false
+      selector:
+        select:
+          options:
+            - "none"
+            - "high"
+            - "max"
     max_tokens:
       name: Max tokens
       description: Maximum tokens to generate in the reply.

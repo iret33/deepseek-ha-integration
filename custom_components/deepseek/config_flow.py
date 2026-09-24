@@ -34,6 +34,7 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
+    CONF_REASONING_EFFORT,
     CONF_TEMPERATURE,
     CONF_TOP_P,
     DEFAULT_BASE_URL,
@@ -41,8 +42,10 @@ from .const import (
     DOMAIN,
     LOGGER,
     MODELS,
+    REASONING_EFFORTS,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
+    RECOMMENDED_REASONING_EFFORT,
     RECOMMENDED_TEMPERATURE,
     RECOMMENDED_TOP_P,
 )
@@ -86,6 +89,7 @@ class DeepSeekConfigFlow(ConfigFlow, domain=DOMAIN):
     """Initial config flow: ask for API key + model."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -117,6 +121,7 @@ class DeepSeekConfigFlow(ConfigFlow, domain=DOMAIN):
                 data=user_input,
                 options={
                     CONF_CHAT_MODEL: chat_model,
+                    CONF_REASONING_EFFORT: RECOMMENDED_REASONING_EFFORT,
                     CONF_LLM_HASS_API: llm.LLM_API_ASSIST,
                     CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,
                     CONF_MAX_TOKENS: RECOMMENDED_MAX_TOKENS,
@@ -223,6 +228,16 @@ def _options_schema(
             CONF_CHAT_MODEL,
             default=options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
         ): _model_selector(),
+        vol.Required(
+            CONF_REASONING_EFFORT,
+            default=options.get(CONF_REASONING_EFFORT, RECOMMENDED_REASONING_EFFORT),
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=REASONING_EFFORTS,
+                mode=SelectSelectorMode.DROPDOWN,
+                translation_key=CONF_REASONING_EFFORT,
+            )
+        ),
         vol.Optional(
             CONF_PROMPT,
             description={
